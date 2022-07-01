@@ -6,7 +6,14 @@ import (
 	"testing"
 
 	"github.com/casbin/casbin"
-	"github.com/gogf/gf/database/gdb"
+	_ "github.com/gogf/gf/contrib/drivers/clickhouse/v2"
+	_ "github.com/gogf/gf/contrib/drivers/mssql/v2"
+	_ "github.com/gogf/gf/contrib/drivers/mysql/v2"
+	_ "github.com/gogf/gf/contrib/drivers/pgsql/v2"
+	_ "github.com/gogf/gf/contrib/drivers/sqlite/v2"
+
+	// _ "github.com/gogf/gf/contrib/drivers/oracle/v2"
+	"github.com/gogf/gf/v2/database/gdb"
 	adapter "github.com/hailaz/gf-casbin-adapter"
 )
 
@@ -28,16 +35,11 @@ var Enforcer *casbin.Enforcer
 //
 // author: hailaz
 func init() {
-	gdb.SetConfig(gdb.Config{
-		"default": gdb.ConfigGroup{
-			gdb.ConfigNode{
-				Type: "mysql",
-				Link: "test:123456@tcp(localhost:3306)/mydb",
-			},
-		},
-	})
 	var err error
-	myDB, err = gdb.New()
+	myDB, err = gdb.New(gdb.ConfigNode{
+		Type: "mysql",
+		Link: "test:123456@tcp(localhost:3306)/mydb",
+	})
 	if err != nil {
 		fmt.Println(err.Error())
 		return

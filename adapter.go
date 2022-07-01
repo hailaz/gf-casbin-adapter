@@ -1,12 +1,13 @@
 package adapter
 
 import (
+	"context"
 	"fmt"
 	"runtime"
 
 	"github.com/casbin/casbin/model"
 	"github.com/casbin/casbin/persist"
-	"github.com/gogf/gf/database/gdb"
+	"github.com/gogf/gf/v2/database/gdb"
 )
 
 type CasbinRule struct {
@@ -73,6 +74,7 @@ func (a *Adapter) open() {
 }
 
 func (a *Adapter) close() {
+	a.o.Close(context.TODO())
 	a.o = nil
 }
 
@@ -109,8 +111,7 @@ func loadPolicyLine(line CasbinRule, model model.Model) {
 // LoadPolicy loads policy from database.
 func (a *Adapter) LoadPolicy(model model.Model) error {
 	var lines []CasbinRule
-	err := a.o.Table(CASBINRULE_TABLE_NAME).Structs(&lines)
-
+	err := a.o.Model(a.tableName).Scan(&lines)
 	if err != nil {
 		return err
 	}
@@ -167,23 +168,23 @@ func (a *Adapter) SavePolicy(model model.Model) error {
 		}
 	}
 
-	_, err := a.o.Insert(CASBINRULE_TABLE_NAME, lines)
+	_, err := a.o.Insert(context.TODO(), a.tableName, lines)
 	return err
 }
 
 // AddPolicy adds a policy rule to the storage.
 func (a *Adapter) AddPolicy(sec string, ptype string, rule []string) error {
 	line := savePolicyLine(ptype, rule)
-	_, err := a.o.Insert(CASBINRULE_TABLE_NAME, &line)
+	_, err := a.o.Insert(context.TODO(), a.tableName, &line)
 	return err
 }
 
 // RemovePolicy removes a policy rule from the storage.
 func (a *Adapter) RemovePolicy(sec string, ptype string, rule []string) error {
-	qs := a.o.Table(CASBINRULE_TABLE_NAME).Safe()
+	qs := a.o.Model(a.tableName).Safe()
 	qs = qs.Where("p_type", ptype)
 	for index := 0; index < len(rule); index++ {
-		qs = qs.And(fmt.Sprintf("v%d", index), rule[index])
+		qs = qs.Where(fmt.Sprintf("v%d", index), rule[index])
 	}
 	_, err := qs.Delete()
 	return err
@@ -192,11 +193,11 @@ func (a *Adapter) RemovePolicy(sec string, ptype string, rule []string) error {
 
 // RemoveFilteredPolicy removes policy rules that match the filter from the storage.
 func (a *Adapter) RemoveFilteredPolicy(sec string, ptype string, fieldIndex int, fieldValues ...string) error {
-	qs := a.o.Table(CASBINRULE_TABLE_NAME).Safe()
+	qs := a.o.Model(a.tableName).Safe()
 	qs = qs.Where("p_type", ptype)
 	for index := 0; index <= 5; index++ {
 		if fieldIndex <= index && index < fieldIndex+len(fieldValues) {
-			qs = qs.And(fmt.Sprintf("v%d", index), fieldValues[index-fieldIndex])
+			qs = qs.Where(fmt.Sprintf("v%d", index), fieldValues[index-fieldIndex])
 		}
 	}
 	_, err := qs.Delete()
