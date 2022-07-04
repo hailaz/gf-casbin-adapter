@@ -1,7 +1,6 @@
 package adapter_test
 
 import (
-	"fmt"
 	"net/http"
 	"testing"
 
@@ -41,14 +40,13 @@ func init() {
 		Link: "test:123456@tcp(localhost:3306)/mydb",
 	})
 	if err != nil {
-		fmt.Println(err.Error())
-		return
+		panic(err)
 	}
 	a := adapter.NewAdapter(adapter.Options{GDB: myDB})
 	Enforcer = casbin.NewEnforcer("./test/rbac.conf", a)
 	err = Enforcer.LoadPolicy()
 	if err != nil {
-		fmt.Println(err.Error())
+		panic(err)
 		return
 	}
 }
