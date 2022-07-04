@@ -14,7 +14,7 @@ import (
 
 	// _ "github.com/gogf/gf/contrib/drivers/oracle/v2"
 	"github.com/gogf/gf/v2/database/gdb"
-	adapter "github.com/hailaz/gf-casbin-adapter"
+	adapter "github.com/hailaz/gf-casbin-adapter/v2"
 )
 
 const (
