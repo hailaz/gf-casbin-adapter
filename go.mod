@@ -1,4 +1,4 @@
-module github.com/hailaz/gf-casbin-adapter
+module github.com/hailaz/gf-casbin-adapter/v2
 
 go 1.16
 
