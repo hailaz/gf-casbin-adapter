@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/casbin/casbin"
+	"github.com/casbin/casbin/v2"
 	_ "github.com/gogf/gf/contrib/drivers/clickhouse/v2"
 	_ "github.com/gogf/gf/contrib/drivers/mssql/v2"
 	_ "github.com/gogf/gf/contrib/drivers/mysql/v2"
@@ -43,11 +43,13 @@ func init() {
 		panic(err)
 	}
 	a := adapter.NewAdapter(adapter.Options{GDB: myDB})
-	Enforcer = casbin.NewEnforcer("./test/rbac.conf", a)
+	Enforcer, err = casbin.NewEnforcer("./test/rbac.conf", a)
+	if err != nil {
+		panic(err)
+	}
 	err = Enforcer.LoadPolicy()
 	if err != nil {
 		panic(err)
-		return
 	}
 }
 
@@ -61,7 +63,12 @@ func Test_New(t *testing.T) {
 	path := "/"
 	method := http.MethodGet
 	t.Logf("\nuser:%v\npath:%v\nmethod:%v", user, path, method)
-	t.Logf("delete user premission:%v", Enforcer.DeletePermissionsForUser(user))
+
+	ok, err := Enforcer.DeletePermissionsForUser(user)
+	if err != nil {
+		t.Error(err)
+	}
+	t.Logf("delete user premission:%v", ok)
 	CheckPremission(t, user, path, method)
 	AddPremission(t, user, "*", ACTION_ALL)
 	CheckPremission(t, user, path, method)
@@ -82,7 +89,11 @@ func Test_New(t *testing.T) {
 //
 // author: hailaz
 func CheckPremission(t *testing.T, user string, path string, method string) {
-	t.Logf("check \tuser[%s] \tpremission[%s] \tpath[%s] \tallow[%v]", user, method, path, Enforcer.Enforce(user, path, method))
+	ok, err := Enforcer.Enforce(user, path, method)
+	if err != nil {
+		t.Error(err)
+	}
+	t.Logf("check \tuser[%s] \tpremission[%s] \tpath[%s] \tallow[%v]", user, method, path, ok)
 }
 
 // Add description
@@ -91,5 +102,9 @@ func CheckPremission(t *testing.T, user string, path string, method string) {
 //
 // author: hailaz
 func AddPremission(t *testing.T, user string, path string, method string) {
-	t.Logf("add \tuser[%s] \tpremission[%s] \tpath[%s] \tresult[%v]", user, method, path, Enforcer.AddPolicy(user, path, method))
+	ok, err := Enforcer.AddPolicy(user, path, method)
+	if err != nil {
+		t.Error(err)
+	}
+	t.Logf("add \tuser[%s] \tpremission[%s] \tpath[%s] \tresult[%v]", user, method, path, ok)
 }
