@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"strings"
 
 	"github.com/casbin/casbin/v2/model"
 	"github.com/casbin/casbin/v2/persist"
@@ -85,25 +86,17 @@ func (a *Adapter) dropTable() {
 }
 
 func loadPolicyLine(line CasbinRule, model model.Model) {
-	lineText := line.PType
-	if line.V0 != "" {
-		lineText += ", " + line.V0
-	}
-	if line.V1 != "" {
-		lineText += ", " + line.V1
-	}
-	if line.V2 != "" {
-		lineText += ", " + line.V2
-	}
-	if line.V3 != "" {
-		lineText += ", " + line.V3
-	}
-	if line.V4 != "" {
-		lineText += ", " + line.V4
-	}
-	if line.V5 != "" {
-		lineText += ", " + line.V5
-	}
+
+	lineText := strings.Join([]string{
+		line.PType,
+		line.V0,
+		line.V1,
+		line.V2,
+		line.V3,
+		line.V4,
+		line.V5,
+	}, ",")
+	lineText = strings.TrimRight(lineText, ",")
 
 	persist.LoadPolicyLine(lineText, model)
 }
