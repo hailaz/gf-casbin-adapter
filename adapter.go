@@ -196,3 +196,34 @@ func (a *Adapter) RemoveFilteredPolicy(sec string, ptype string, fieldIndex int,
 	_, err := qs.Delete()
 	return err
 }
+
+func (a *Adapter) rawDelete(ctx context.Context, tx gdb.TX, line CasbinRule) error {
+	_, err := tx.Model(a.tableName).Safe().Ctx(ctx).Where(line).Delete()
+	return err
+}
+
+func (a *Adapter) AddPolicies(sec string, ptype string, rules [][]string) error {
+	var lines []CasbinRule
+	for _, rule := range rules {
+		line := savePolicyLine(ptype, rule)
+		lines = append(lines, line)
+	}
+	_, err := a.o.Insert(context.TODO(), a.tableName, &lines)
+	return err
+}
+
+func (a *Adapter) RemovePolicies(sec string, ptype string, rules [][]string) error {
+	return a.RemovePoliciesCtx(context.TODO(), sec, ptype, rules)
+}
+
+// RemovePoliciesCtx removes multiple policy rules from the storage.
+func (a *Adapter) RemovePoliciesCtx(ctx context.Context, sec string, ptype string, rules [][]string) error {
+	return a.o.Transaction(ctx, func(ctx context.Context, tx gdb.TX) error {
+		for _, rule := range rules {
+			line := savePolicyLine(ptype, rule)
+			if err := a.rawDelete(ctx, tx, line); err != nil {
+			}
+		}
+		return nil
+	})
+}
