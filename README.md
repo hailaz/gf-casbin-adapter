@@ -2,7 +2,7 @@
 
 ## 如何使用
 
-1. 创建数据库表
+### 1. 创建数据库表
 
 ```sql
 DROP TABLE IF EXISTS `casbin_rule`;
@@ -19,11 +19,12 @@ CREATE TABLE `casbin_rule` (
 ) ENGINE=InnoDB;
 ```
 
-2. 使用
+### 2. 使用
 
 具体看 [adapter_test.go](test/adapter_test.go)
 
 > 特别注意：默认的`p_type`字段名改为`ptype`，如需要使用`p_type`参考如下代码
+
 ```golang
 adapter.NewAdapter(
     adapter.Options{
@@ -31,7 +32,6 @@ adapter.NewAdapter(
         FieldName: adapter.FieldName{PType: "p_type"},
 })
 ```
-
 
 ## For GoFrame v2
 
