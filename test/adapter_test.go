@@ -100,6 +100,10 @@ func Test_New(t *testing.T) {
 	path1 := "/api/v1/*"
 	checkPathTrue := "/api/v1/user/list"
 	checkPathFalse := "/api/v2/user/list"
+	ok, err = Enforcer.DeletePermissionsForUser(user1)
+	if err != nil {
+		t.Fatal(err)
+	}
 	AddPremission(t, user1, path1, ACTION_GET)
 	CheckPremission(t, user1, checkPathTrue, ACTION_POST)
 	CheckPremission(t, user1, checkPathFalse, http.MethodGet)

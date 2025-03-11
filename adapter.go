@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"context"
+	"fmt"
 	"runtime"
 	"strings"
 
@@ -9,25 +10,14 @@ import (
 	"github.com/casbin/casbin/v2/persist"
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/frame/g"
-	"github.com/gogf/gf/v2/os/gctx"
 )
-
-type CasbinRule struct {
-	Id    int64
-	PType string
-	V0    string
-	V1    string
-	V2    string
-	V3    string
-	V4    string
-	V5    string
-}
 
 // FieldName 字段名
 type FieldName struct {
 	Id    string
 	PType string
 	V     []string
+	VLen  int
 }
 
 const (
@@ -44,6 +34,7 @@ var (
 		Id:    "id",
 		PType: "ptype",
 		V:     []string{"v0", "v1", "v2", "v3", "v4", "v5"},
+		VLen:  CASBIN_V_LEN,
 	}
 )
 
@@ -52,7 +43,7 @@ type Options struct {
 	Ctx       context.Context
 	GDB       gdb.DB // gdb
 	TableName string // 表名
-	FieldName FieldName
+	FieldName *FieldName
 }
 
 // Adapter represents the Xorm adapter for policy storage.
@@ -75,7 +66,7 @@ func NewAdapter(opts Options) *Adapter {
 	if opts.Ctx != nil {
 		a.ctx = opts.Ctx
 	} else {
-		a.ctx = gctx.New()
+		a.ctx = context.Background()
 	}
 
 	if opts.TableName != "" {
@@ -83,9 +74,6 @@ func NewAdapter(opts Options) *Adapter {
 	}
 
 	a.SetFieldName(opts.FieldName)
-
-	// Open the DB, create it if not existed.
-	a.open()
 
 	// Call the destructor when the object is released.
 	runtime.SetFinalizer(a, finalizer)
@@ -106,91 +94,49 @@ func NewAdapterWithTableName(gdb gdb.DB, tableName string) *Adapter {
 func finalizer(a *Adapter) {
 }
 
-func (a *Adapter) SetFieldName(fieldName FieldName) {
+func (a *Adapter) SetFieldName(fieldName *FieldName) {
+	if fieldName == nil {
+		return
+	}
 	if fieldName.Id != "" {
 		a.fieldName.Id = fieldName.Id
 	}
 	if fieldName.PType != "" {
 		a.fieldName.PType = fieldName.PType
 	}
-	if len(fieldName.V) >= 5 {
-		a.fieldName.V = fieldName.V
+	vLen := len(fieldName.V)
+	if vLen >= CASBIN_V_LEN {
+		a.fieldName.VLen = vLen
+		a.fieldName.V = make([]string, vLen)
+		copy(a.fieldName.V, fieldName.V)
 	}
-}
-
-func (a *Adapter) open() {
-
-}
-
-// close 关闭
-func (a *Adapter) close() {
-	a.o.Close(a.ctx)
-	a.o = nil
-}
-
-// createTable 不支持
-func (a *Adapter) createTable() {
-}
-
-// dropTable 不支持
-func (a *Adapter) dropTable() {
-}
-
-func loadPolicyLine(line CasbinRule, model model.Model) {
-
-	lineText := strings.Join([]string{
-		line.PType,
-		line.V0,
-		line.V1,
-		line.V2,
-		line.V3,
-		line.V4,
-		line.V5,
-	}, ",")
-	lineText = strings.TrimRight(lineText, ",")
-
-	persist.LoadPolicyLine(lineText, model)
 }
 
 // LoadPolicy loads policy from database.
 func (a *Adapter) LoadPolicy(model model.Model) error {
-	var lines []CasbinRule
-	err := a.o.Model(a.tableName).Scan(&lines)
+	res, err := a.o.Model(a.tableName).All()
 	if err != nil {
 		return err
 	}
 
-	for _, line := range lines {
-		loadPolicyLine(line, model)
+	for _, line := range res {
+		fmt.Println("res line ===", line)
+		fmt.Println("line.Map() ===", line.Map())
+		vList := make([]string, 0, a.fieldName.VLen+1)
+		vList = append(vList, line[a.fieldName.PType].String())
+		for index := 0; index < a.fieldName.VLen; index++ {
+			vList = append(vList, line[a.fieldName.V[index]].String())
+		}
+		lineText := strings.Join(vList, ",")
+		fmt.Println("lineText ===", lineText)
+		lineText = strings.TrimRight(lineText, ",")
+		fmt.Println("lineText ---", lineText)
+		persist.LoadPolicyLine(lineText, model)
+
+		// loadPolicyLine(line, model)
 	}
 
 	return nil
-}
-
-func savePolicyLine(ptype string, rule []string) CasbinRule {
-	line := CasbinRule{}
-
-	line.PType = ptype
-	if len(rule) > 0 {
-		line.V0 = rule[0]
-	}
-	if len(rule) > 1 {
-		line.V1 = rule[1]
-	}
-	if len(rule) > 2 {
-		line.V2 = rule[2]
-	}
-	if len(rule) > 3 {
-		line.V3 = rule[3]
-	}
-	if len(rule) > 4 {
-		line.V4 = rule[4]
-	}
-	if len(rule) > 5 {
-		line.V5 = rule[5]
-	}
-
-	return line
 }
 
 // toData description
@@ -199,7 +145,12 @@ func (a *Adapter) toData(ptype string, rule []string) g.Map {
 		a.fieldName.PType: ptype,
 	}
 
+	vLen := len(a.fieldName.V)
+
 	for index := 0; index < len(rule); index++ {
+		if index >= vLen {
+			break
+		}
 		data[a.fieldName.V[index]] = rule[index]
 	}
 
@@ -208,30 +159,30 @@ func (a *Adapter) toData(ptype string, rule []string) g.Map {
 
 // SavePolicy saves policy to database.
 func (a *Adapter) SavePolicy(model model.Model) error {
-	var lines []CasbinRule
+
+	var lines g.List
 
 	for ptype, ast := range model["p"] {
 		for _, rule := range ast.Policy {
-			line := savePolicyLine(ptype, rule)
+			line := a.toData(ptype, rule)
 			lines = append(lines, line)
 		}
 	}
 
 	for ptype, ast := range model["g"] {
 		for _, rule := range ast.Policy {
-			line := savePolicyLine(ptype, rule)
+			line := a.toData(ptype, rule)
 			lines = append(lines, line)
 		}
 	}
 
-	_, err := a.o.Ctx(a.ctx).Model(a.tableName).FieldsEx(a.fieldName.Id).Data(lines).Insert()
+	_, err := a.o.Ctx(a.ctx).Model(a.tableName).Data(lines).Insert()
 	return err
 }
 
 // AddPolicy adds a policy rule to the storage.
 func (a *Adapter) AddPolicy(sec string, ptype string, rule []string) error {
-	line := savePolicyLine(ptype, rule)
-	_, err := a.o.Ctx(a.ctx).Model(a.tableName).FieldsEx(a.fieldName.Id).Insert(line)
+	_, err := a.o.Ctx(a.ctx).Model(a.tableName).Data(a.toData(ptype, rule)).Insert()
 	return err
 }
 
@@ -261,12 +212,12 @@ func (a *Adapter) RemoveFilteredPolicy(sec string, ptype string, fieldIndex int,
 }
 
 func (a *Adapter) AddPolicies(sec string, ptype string, rules [][]string) error {
-	var lines []CasbinRule
+	var lines g.List
 	for _, rule := range rules {
-		line := savePolicyLine(ptype, rule)
+		line := a.toData(ptype, rule)
 		lines = append(lines, line)
 	}
-	_, err := a.o.Ctx(a.ctx).Model(a.tableName).FieldsEx(a.fieldName.Id).Data(lines).Insert()
+	_, err := a.o.Ctx(a.ctx).Model(a.tableName).Data(lines).Insert()
 	return err
 }
 
