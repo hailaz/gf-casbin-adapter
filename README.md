@@ -25,12 +25,12 @@ CREATE TABLE `casbin_rule` (
 
 > 特别注意：默认的`p_type`字段名改为`ptype`，如需要使用`p_type`参考如下代码
 > ```
-adapter.NewAdapter(
-		adapter.Options{
-			GDB:       myDB,
-			FieldName: adapter.FieldName{PType: "p_type"},
-		})
-```
+> adapter.NewAdapter(
+> 		adapter.Options{
+> 			GDB:       myDB,
+> 			FieldName: adapter.FieldName{PType: "p_type"},
+> 		})
+> ```
 
 
 ## For GoFrame v2
