@@ -2,7 +2,7 @@ package test
 
 import (
 	"context"
-	"net/http"
+	"fmt"
 	"testing"
 
 	"github.com/casbin/casbin/v2"
@@ -23,133 +23,149 @@ const (
 	ACTION_PUT    = "(PUT)"
 	ACTION_DELETE = "(DELETE)"
 	ACTION_ALL    = "(GET)|(POST)|(PUT)|(DELETE)|(PATCH)|(OPTIONS)|(HEAD)"
-	ADMIN_NAME    = "admin" //超级管理员用户名
+	ADMIN_NAME    = "admin"  //超级管理员用户名
+	NORMAL_NAME   = "hailaz" //普通用户用户名
 )
 
-var myDB gdb.DB
-var Enforcer *casbin.Enforcer
+type testCase struct {
+	name     string
+	user     string
+	path     string
+	method   string
+	expected bool
+}
 
-// init description
-//
-// createTime: 2022-03-04 17:14:35
-//
-// author: hailaz
-func init() {
-	var err error
-	myDB, err = gdb.New(gdb.ConfigNode{
-		Type:  "sqlite",
-		Link:  "sqlite::@file(casbin.db)",
-		Debug: true,
-	})
+type dbConfig struct {
+	runTest bool
+	name    string
+	config  gdb.ConfigNode
+	initSQL string
+}
+
+func getTestDBConfigs() []dbConfig {
+	return []dbConfig{
+		{
+			runTest: true,
+			name:    "sqlite",
+			config: gdb.ConfigNode{
+				Type:  "sqlite",
+				Link:  "sqlite::@file(casbin.db)",
+				Debug: true,
+			},
+			initSQL: `CREATE TABLE IF NOT EXISTS casbin_rule (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				ptype VARCHAR(255) NOT NULL DEFAULT '',
+				v0 VARCHAR(255) NOT NULL DEFAULT '',
+				v1 VARCHAR(255) NOT NULL DEFAULT '',
+				v2 VARCHAR(255) NOT NULL DEFAULT '',
+				v3 VARCHAR(255) NOT NULL DEFAULT '',
+				v4 VARCHAR(255) NOT NULL DEFAULT '',
+				v5 VARCHAR(255) NOT NULL DEFAULT ''
+			)`,
+		},
+		// 可以添加其他数据库配置
+	}
+}
+
+// TestObj description
+type TestObj struct {
+	t        *testing.T
+	enforcer *casbin.Enforcer
+}
+
+func initDB(conf dbConfig) (*casbin.Enforcer, error) {
+	myDB, err := gdb.New(conf.config)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("init db failed: %v", err)
 	}
 
-	_, err = myDB.Exec(context.TODO(), `
-		CREATE TABLE IF NOT EXISTS casbin_rule (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			ptype VARCHAR(255) NOT NULL DEFAULT '',
-			v0 VARCHAR(255) NOT NULL DEFAULT '',
-			v1 VARCHAR(255) NOT NULL DEFAULT '',
-			v2 VARCHAR(255) NOT NULL DEFAULT '',
-			v3 VARCHAR(255) NOT NULL DEFAULT '',
-			v4 VARCHAR(255) NOT NULL DEFAULT '',
-			v5 VARCHAR(255) NOT NULL DEFAULT ''
-		)
-	`)
-	if err != nil {
-		panic(err)
+	if conf.initSQL != "" {
+		if _, err = myDB.Exec(context.TODO(), conf.initSQL); err != nil {
+			return nil, fmt.Errorf("init table failed: %v", err)
+		}
 	}
 
-	a := adapter.NewAdapter(
-		adapter.Options{
-			GDB: myDB,
+	a := adapter.NewAdapter(adapter.Options{GDB: myDB})
+	e, err := casbin.NewEnforcer("rbac.conf", a)
+	if err != nil {
+		return nil, fmt.Errorf("new enforcer failed: %v", err)
+	}
+
+	if err = e.LoadPolicy(); err != nil {
+		return nil, fmt.Errorf("load policy failed: %v", err)
+	}
+
+	return e, nil
+}
+
+func (o *TestObj) SetupTestData(rules [][]string) {
+	// 清理已有策略
+	// enforcer.ClearPolicy()
+	o.enforcer.DeletePermissionForUser(ADMIN_NAME)
+	o.enforcer.DeletePermissionForUser(NORMAL_NAME)
+
+	if _, err := o.enforcer.AddPolicies(rules); err != nil {
+		o.t.Fatalf("add policies failed: %v", err)
+	}
+}
+
+func Test_CasbinPolicy(t *testing.T) {
+	rules := [][]string{
+		// 设置管理员权限
+		{ADMIN_NAME, "*", ACTION_ALL},
+		// 设置普通用户权限
+		{NORMAL_NAME, "/api/v1/*", ACTION_GET},
+		{NORMAL_NAME, "/api/v2/user/list", ACTION_GET},
+		{NORMAL_NAME, "/api/v2/user/add", ACTION_POST},
+	}
+	testCases := []testCase{
+		{
+			name:     "admin with root access",
+			user:     ADMIN_NAME,
+			path:     "/",
+			method:   ACTION_GET,
+			expected: true,
+		},
+		{
+			name:     "normal user with api access",
+			user:     NORMAL_NAME,
+			path:     "/api/v1/user/list",
+			method:   ACTION_GET,
+			expected: true,
+		},
+		{
+			name:     "normal user with wrong method",
+			user:     NORMAL_NAME,
+			path:     "/api/v1/user/list",
+			method:   ACTION_POST,
+			expected: false,
+		},
+	}
+
+	for _, dbConf := range getTestDBConfigs() {
+		if !dbConf.runTest {
+			continue
+		}
+		t.Run(dbConf.name, func(t *testing.T) {
+			enforcer, err := initDB(dbConf)
+			if err != nil {
+				t.Fatalf("init db failed: %v", err)
+			}
+
+			obj := TestObj{t: t, enforcer: enforcer}
+			obj.SetupTestData(rules)
+
+			for _, tc := range testCases {
+				t.Run(tc.name, func(t *testing.T) {
+					ok, err := enforcer.Enforce(tc.user, tc.path, tc.method)
+					if err != nil {
+						t.Errorf("enforce failed: %v", err)
+					}
+					if ok != tc.expected {
+						t.Errorf("expected %v but got %v", tc.expected, ok)
+					}
+				})
+			}
 		})
-
-	Enforcer, err = casbin.NewEnforcer("rbac.conf", a)
-	if err != nil {
-		panic(err)
 	}
-	err = Enforcer.LoadPolicy()
-	if err != nil {
-		panic(err)
-	}
-}
-
-// Test_New description
-//
-// createTime: 2022-03-04 17:13:35
-//
-// author: hailaz
-func Test_New(t *testing.T) {
-	user := ADMIN_NAME
-	path := "/"
-	method := http.MethodGet
-	t.Logf("\nuser:%v\npath:%v\nmethod:%v", user, path, method)
-
-	ok, err := Enforcer.DeletePermissionsForUser(user)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("delete user premission:%v", ok)
-	CheckPremission(t, user, path, method)
-	AddPremission(t, user, "*", ACTION_ALL)
-	CheckPremission(t, user, path, method)
-
-	user1 := "hailaz"
-	path1 := "/api/v1/*"
-	checkPathTrue := "/api/v1/user/list"
-	checkPathFalse := "/api/v2/user/list"
-	ok, err = Enforcer.DeletePermissionsForUser(user1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	AddPremission(t, user1, path1, ACTION_GET)
-	CheckPremission(t, user1, checkPathTrue, ACTION_POST)
-	CheckPremission(t, user1, checkPathFalse, http.MethodGet)
-	CheckPremission(t, user1, checkPathTrue, http.MethodGet)
-
-	Enforcer.RemovePolicies([][]string{
-		{user1, "/api/v2/user/list", ACTION_GET},
-		{user1, "/api/v2/user/add", ACTION_POST},
-		{user1, "/api/v2/user/edit", ACTION_PUT},
-		{user1, "/api/v2/user/del", ACTION_DELETE},
-	})
-
-	Enforcer.AddPolicies([][]string{
-		{user1, "/api/v2/user/list", ACTION_GET},
-		{user1, "/api/v2/user/add", ACTION_POST},
-		{user1, "/api/v2/user/edit", ACTION_PUT},
-		{user1, "/api/v2/user/del", ACTION_DELETE},
-	})
-	CheckPremission(t, user1, "/api/v2/user/list", ACTION_GET)
-	CheckPremission(t, user1, "/api/v2/user/add", ACTION_POST)
-	CheckPremission(t, user1, "/api/v2/user/edit", ACTION_PUT)
-	CheckPremission(t, user1, "/api/v2/user/del", ACTION_DELETE)
-}
-
-// CheckPremission description
-//
-// createTime: 2022-07-01 11:34:19
-//
-// author: hailaz
-func CheckPremission(t *testing.T, user string, path string, method string) {
-	ok, err := Enforcer.Enforce(user, path, method)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("check \tuser[%s] \tpremission[%s] \tpath[%s] \tallow[%v]", user, method, path, ok)
-}
-
-// Add description
-//
-// createTime: 2022-07-01 12:19:16
-//
-// author: hailaz
-func AddPremission(t *testing.T, user string, path string, method string) {
-	ok, err := Enforcer.AddPolicy(user, path, method)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("add \tuser[%s] \tpremission[%s] \tpath[%s] \tresult[%v]", user, method, path, ok)
 }

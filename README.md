@@ -29,7 +29,7 @@ CREATE TABLE `casbin_rule` (
 adapter.NewAdapter(
     adapter.Options{
         GDB:       myDB,
-        FieldName: adapter.FieldName{PType: "p_type"},
+        FieldName: &adapter.FieldName{PType: "p_type"},
 })
 ```
 

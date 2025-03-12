@@ -2,7 +2,6 @@ package adapter
 
 import (
 	"context"
-	"fmt"
 	"runtime"
 	"strings"
 
@@ -29,6 +28,7 @@ var (
 	// 判断是否实现了persist.*接口
 	_ persist.Adapter      = new(Adapter)
 	_ persist.BatchAdapter = new(Adapter)
+	// _ persist.Dispatcher   = new(Adapter)
 
 	DefaultFieldName = FieldName{
 		Id:    "id",
@@ -120,20 +120,14 @@ func (a *Adapter) LoadPolicy(model model.Model) error {
 	}
 
 	for _, line := range res {
-		fmt.Println("res line ===", line)
-		fmt.Println("line.Map() ===", line.Map())
 		vList := make([]string, 0, a.fieldName.VLen+1)
 		vList = append(vList, line[a.fieldName.PType].String())
 		for index := 0; index < a.fieldName.VLen; index++ {
 			vList = append(vList, line[a.fieldName.V[index]].String())
 		}
 		lineText := strings.Join(vList, ",")
-		fmt.Println("lineText ===", lineText)
 		lineText = strings.TrimRight(lineText, ",")
-		fmt.Println("lineText ---", lineText)
 		persist.LoadPolicyLine(lineText, model)
-
-		// loadPolicyLine(line, model)
 	}
 
 	return nil
@@ -237,3 +231,24 @@ func (a *Adapter) RemovePoliciesCtx(ctx context.Context, sec string, ptype strin
 		return nil
 	})
 }
+
+// // ClearPolicy clears all current policy in all instances
+// func (a *Adapter) ClearPolicy() error {
+// 	_, err := a.o.Model(a.tableName).WhereGT("id", 0).Delete()
+// 	return err
+// }
+
+// // UpdatePolicy updates policy rule from all instance.
+// func (a *Adapter) UpdatePolicy(sec string, ptype string, oldRule, newRule []string) error {
+// 	return nil
+// }
+
+// // UpdatePolicies updates some policy rules from all instance
+// func (a *Adapter) UpdatePolicies(sec string, ptype string, oldrules, newRules [][]string) error {
+// 	return nil
+// }
+
+// // UpdateFilteredPolicies deletes old rules and adds new rules.
+// func (a *Adapter) UpdateFilteredPolicies(sec string, ptype string, oldRules [][]string, newRules [][]string) error {
+// 	return nil
+// }
