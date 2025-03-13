@@ -1,5 +1,7 @@
 # gf-casbin-adapter
 
+[GoFrame](https://github.com/gogf/gf) 的 [Casbin](https://github.com/casbin/casbin) 适配器
+
 ## 如何使用
 
 ### 1. 创建数据库表
@@ -23,7 +25,7 @@ CREATE TABLE `casbin_rule` (
 
 具体看 [adapter_test.go](test/adapter_test.go)
 
-> 特别注意：旧版（v2.8.0以前）的`p_type`字段名改为`ptype`，如需要使用`p_type`参考如下代码
+> 特别注意：旧版（v2.8.0 以前）的`p_type`字段名改为`ptype`，如需要使用`p_type`参考如下代码
 
 ```golang
 adapter.NewAdapter(
