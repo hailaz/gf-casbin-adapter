@@ -146,8 +146,10 @@ func (o *TestObj) SetupTestData(rules [][]string) {
 	o.enforcer.DeletePermissionForUser(ADMIN_NAME)
 	o.enforcer.DeletePermissionForUser(NORMAL_NAME)
 
-	if _, err := o.enforcer.AddPolicies(rules); err != nil {
+	if exist, err := o.enforcer.AddPolicies(rules); err != nil {
 		o.t.Fatalf("add policies failed: %v", err)
+	} else {
+		o.t.Log("add policies success:", exist)
 	}
 }
 
@@ -212,6 +214,112 @@ func Test_CasbinPolicy(t *testing.T) {
 						t.Errorf("expected %v but got %v", tc.expected, ok)
 					}
 				})
+			}
+		})
+	}
+}
+
+// Test_UpdatePolicy 测试更新策略功能
+func Test_UpdatePolicy(t *testing.T) {
+	rules := [][]string{
+		{ADMIN_NAME, "*", ACTION_ALL},
+		{NORMAL_NAME, "/api/v1/*", ACTION_GET},
+	}
+
+	for _, dbConf := range getTestDBConfigs() {
+		if !dbConf.runTest {
+			continue
+		}
+		t.Run(dbConf.name, func(t *testing.T) {
+			enforcer, err := initCasbinEnforcer(dbConf)
+			if err != nil {
+				t.Fatalf("init db failed: %v", err)
+			}
+
+			obj := TestObj{t: t, enforcer: enforcer}
+			obj.SetupTestData(rules)
+
+			// 测试更新策略
+			oldRule := []string{NORMAL_NAME, "/api/v1/*", ACTION_GET}
+			newRule := []string{NORMAL_NAME, "/api/v2/*", ACTION_GET}
+
+			success, err := enforcer.UpdatePolicy(oldRule, newRule)
+			if err != nil {
+				t.Errorf("update policy failed: %v", err)
+			}
+			if !success {
+				t.Error("update policy failed")
+			}
+
+			// 验证更新后的权限
+			testCases := []testCase{
+				{
+					name:     "test old path after update",
+					user:     NORMAL_NAME,
+					path:     "/api/v1/user/list",
+					method:   ACTION_GET,
+					expected: false,
+				},
+				{
+					name:     "test new path after update",
+					user:     NORMAL_NAME,
+					path:     "/api/v2/user/list",
+					method:   ACTION_GET,
+					expected: true,
+				},
+			}
+
+			for _, tc := range testCases {
+				t.Run(tc.name, func(t *testing.T) {
+					ok, err := enforcer.Enforce(tc.user, tc.path, tc.method)
+					if err != nil {
+						t.Errorf("enforce failed: %v", err)
+					}
+					if ok != tc.expected {
+						t.Errorf("expected %v but got %v", tc.expected, ok)
+					}
+				})
+			}
+		})
+	}
+}
+
+// Test_RemovePolicy 测试删除策略功能
+func Test_RemovePolicy(t *testing.T) {
+	rules := [][]string{
+		{ADMIN_NAME, "*", ACTION_ALL},
+		{NORMAL_NAME, "/api/v1/*", ACTION_GET},
+	}
+
+	for _, dbConf := range getTestDBConfigs() {
+		if !dbConf.runTest {
+			continue
+		}
+		t.Run(dbConf.name, func(t *testing.T) {
+			enforcer, err := initCasbinEnforcer(dbConf)
+			if err != nil {
+				t.Fatalf("init db failed: %v", err)
+			}
+
+			obj := TestObj{t: t, enforcer: enforcer}
+			obj.SetupTestData(rules)
+
+			// 删除策略
+			success, err := enforcer.RemovePolicy(NORMAL_NAME, "/api/v1/*", ACTION_GET)
+			if err != nil {
+				t.Errorf("remove policy failed: %v", err)
+			}
+			if !success {
+				t.Error("remove policy failed")
+			}
+
+			// 验证删除后的权限
+			ok, err := enforcer.Enforce(NORMAL_NAME, "/api/v1/user/list", ACTION_GET)
+			if err != nil {
+				t.Errorf("enforce failed: %v", err)
+			}
+			if ok {
+				t.Error("policy should be removed")
 			}
 		})
 	}

@@ -11,6 +11,13 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 )
 
+// 判断是否实现了persist.*接口
+var (
+	_ persist.Adapter          = new(Adapter)
+	_ persist.BatchAdapter     = new(Adapter)
+	_ persist.UpdatableAdapter = new(Adapter)
+)
+
 // FieldName 字段名
 type FieldName struct {
 	Id    string
@@ -25,11 +32,7 @@ const (
 )
 
 var (
-	// 判断是否实现了persist.*接口
-	_ persist.Adapter      = new(Adapter)
-	_ persist.BatchAdapter = new(Adapter)
-	// _ persist.Dispatcher   = new(Adapter)
-
+	// 默认配置
 	DefaultFieldName = FieldName{
 		Id:    "id",
 		PType: "ptype",
@@ -231,24 +234,3 @@ func (a *Adapter) RemovePoliciesCtx(ctx context.Context, sec string, ptype strin
 		return nil
 	})
 }
-
-// // ClearPolicy clears all current policy in all instances
-// func (a *Adapter) ClearPolicy() error {
-// 	_, err := a.o.Model(a.tableName).WhereGT("id", 0).Delete()
-// 	return err
-// }
-
-// // UpdatePolicy updates policy rule from all instance.
-// func (a *Adapter) UpdatePolicy(sec string, ptype string, oldRule, newRule []string) error {
-// 	return nil
-// }
-
-// // UpdatePolicies updates some policy rules from all instance
-// func (a *Adapter) UpdatePolicies(sec string, ptype string, oldrules, newRules [][]string) error {
-// 	return nil
-// }
-
-// // UpdateFilteredPolicies deletes old rules and adds new rules.
-// func (a *Adapter) UpdateFilteredPolicies(sec string, ptype string, oldRules [][]string, newRules [][]string) error {
-// 	return nil
-// }
