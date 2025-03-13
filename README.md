@@ -15,7 +15,7 @@ CREATE TABLE `casbin_rule` (
   `v3` varchar(255) NOT NULL DEFAULT '',
   `v4` varchar(255) NOT NULL DEFAULT '',
   `v5` varchar(255) NOT NULL DEFAULT '',
-  PRIMARY KEY (`id`) USING BTREE
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB;
 ```
 
@@ -23,7 +23,7 @@ CREATE TABLE `casbin_rule` (
 
 具体看 [adapter_test.go](test/adapter_test.go)
 
-> 特别注意：默认的`p_type`字段名改为`ptype`，如需要使用`p_type`参考如下代码
+> 特别注意：旧版（v2.8.0以前）的`p_type`字段名改为`ptype`，如需要使用`p_type`参考如下代码
 
 ```golang
 adapter.NewAdapter(

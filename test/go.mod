@@ -4,6 +4,7 @@ go 1.20
 
 require (
 	github.com/casbin/casbin/v2 v2.103.0
+	github.com/gogf/gf/contrib/drivers/mysql/v2 v2.8.3
 	github.com/gogf/gf/contrib/drivers/sqlite/v2 v2.8.3
 	github.com/gogf/gf/v2 v2.8.3
 	github.com/hailaz/gf-casbin-adapter/v2 v2.0.0-00010101000000-000000000000
@@ -21,6 +22,7 @@ require (
 	github.com/glebarez/go-sqlite v1.21.2 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/go-sql-driver/mysql v1.7.1 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/grokify/html-strip-tags-go v0.1.0 // indirect

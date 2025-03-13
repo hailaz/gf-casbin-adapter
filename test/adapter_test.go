@@ -10,11 +10,11 @@ import (
 	"github.com/gogf/gf/v2/database/gdb"
 	adapter "github.com/hailaz/gf-casbin-adapter/v2"
 
+	_ "github.com/gogf/gf/contrib/drivers/mysql/v2"
 	_ "github.com/gogf/gf/contrib/drivers/sqlite/v2"
 	// _ "github.com/gogf/gf/contrib/drivers/clickhouse/v2"
 	// _ "github.com/gogf/gf/contrib/drivers/mssql/v2"
 	// _ "github.com/gogf/gf/contrib/drivers/pgsql/v2"
-	// _ "github.com/gogf/gf/contrib/drivers/mysql/v2"
 	// _ "github.com/gogf/gf/contrib/drivers/oracle/v2"
 )
 
@@ -45,6 +45,7 @@ type adapterConfig struct {
 	config    gdb.ConfigNode // 数据库配置
 	initSQL   string         // 初始化 SQL
 	modelPath string         // Casbin 模型配置路径
+	tableName string         // 自定义表名
 }
 
 // getTestDBConfigs 返回测试数据库配置列表
@@ -58,7 +59,8 @@ func getTestDBConfigs() []adapterConfig {
 				Link:  "sqlite::@file(casbin.db)",
 				Debug: true,
 			},
-			initSQL: `CREATE TABLE IF NOT EXISTS casbin_rule (
+			tableName: "casbin_rule_test",
+			initSQL: `CREATE TABLE IF NOT EXISTS casbin_rule_test (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
 				ptype VARCHAR(255) NOT NULL DEFAULT '',
 				v0 VARCHAR(255) NOT NULL DEFAULT '',
@@ -70,7 +72,28 @@ func getTestDBConfigs() []adapterConfig {
 			)`,
 			modelPath: "conf/rbac.conf",
 		},
-		// 可以添加其他数据库配置
+		{
+			runTest: true,
+			name:    "mysql",
+			config: gdb.ConfigNode{
+				Type:  "mysql",
+				Link:  "test:123456@tcp(localhost:3306)/casbin",
+				Debug: true,
+			},
+			tableName: "casbin_rule_test",
+			initSQL: `CREATE TABLE IF NOT EXISTS casbin_rule_test (
+				id int(11) NOT NULL AUTO_INCREMENT,
+				ptype varchar(255) NOT NULL DEFAULT '',
+				v0 varchar(255) NOT NULL DEFAULT '',
+				v1 varchar(255) NOT NULL DEFAULT '',
+				v2 varchar(255) NOT NULL DEFAULT '',
+				v3 varchar(255) NOT NULL DEFAULT '',
+				v4 varchar(255) NOT NULL DEFAULT '',
+				v5 varchar(255) NOT NULL DEFAULT '',
+				PRIMARY KEY (id)
+			) ENGINE=InnoDB`,
+			modelPath: "conf/rbac.conf",
+		},
 	}
 }
 
@@ -99,7 +122,10 @@ func initCasbinEnforcer(conf adapterConfig) (*casbin.Enforcer, error) {
 		}
 	}
 
-	a := adapter.NewAdapter(adapter.Options{GDB: myDB})
+	a := adapter.NewAdapter(adapter.Options{
+		GDB:       myDB,
+		TableName: conf.tableName,
+	})
 	e, err := casbin.NewEnforcer(conf.modelPath, a)
 	if err != nil {
 		return nil, fmt.Errorf("new enforcer failed: %v", err)
