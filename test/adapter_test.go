@@ -1,3 +1,4 @@
+// Package test 提供 gf-casbin-adapter 的集成测试
 package test
 
 import (
@@ -17,33 +18,38 @@ import (
 	// _ "github.com/gogf/gf/contrib/drivers/oracle/v2"
 )
 
+// HTTP 方法常量定义
 const (
-	ACTION_GET    = "(GET)"
-	ACTION_POST   = "(POST)"
-	ACTION_PUT    = "(PUT)"
-	ACTION_DELETE = "(DELETE)"
-	ACTION_ALL    = "(GET)|(POST)|(PUT)|(DELETE)|(PATCH)|(OPTIONS)|(HEAD)"
-	ADMIN_NAME    = "admin"  //超级管理员用户名
-	NORMAL_NAME   = "hailaz" //普通用户用户名
+	ACTION_GET    = "(GET)"                                                // GET 请求方法
+	ACTION_POST   = "(POST)"                                               // POST 请求方法
+	ACTION_PUT    = "(PUT)"                                                // PUT 请求方法
+	ACTION_DELETE = "(DELETE)"                                             // DELETE 请求方法
+	ACTION_ALL    = "(GET)|(POST)|(PUT)|(DELETE)|(PATCH)|(OPTIONS)|(HEAD)" // 所有 HTTP 方法
+	ADMIN_NAME    = "admin"                                                // 超级管理员用户名
+	NORMAL_NAME   = "hailaz"                                               // 普通用户用户名
 )
 
+// testCase 定义测试用例结构
 type testCase struct {
-	name     string
-	user     string
-	path     string
-	method   string
-	expected bool
+	name     string // 测试用例名称
+	user     string // 测试用户
+	path     string // 测试路径
+	method   string // 请求方法
+	expected bool   // 预期结果
 }
 
-type dbConfig struct {
-	runTest bool
-	name    string
-	config  gdb.ConfigNode
-	initSQL string
+// adapterConfig 定义适配器配置结构
+type adapterConfig struct {
+	runTest   bool           // 是否运行测试
+	name      string         // 数据库类型名称
+	config    gdb.ConfigNode // 数据库配置
+	initSQL   string         // 初始化 SQL
+	modelPath string         // Casbin 模型配置路径
 }
 
-func getTestDBConfigs() []dbConfig {
-	return []dbConfig{
+// getTestDBConfigs 返回测试数据库配置列表
+func getTestDBConfigs() []adapterConfig {
+	return []adapterConfig{
 		{
 			runTest: true,
 			name:    "sqlite",
@@ -62,18 +68,26 @@ func getTestDBConfigs() []dbConfig {
 				v4 VARCHAR(255) NOT NULL DEFAULT '',
 				v5 VARCHAR(255) NOT NULL DEFAULT ''
 			)`,
+			modelPath: "conf/rbac.conf",
 		},
 		// 可以添加其他数据库配置
 	}
 }
 
-// TestObj description
+// TestObj 封装测试对象
 type TestObj struct {
-	t        *testing.T
-	enforcer *casbin.Enforcer
+	t        *testing.T       // 测试实例
+	enforcer *casbin.Enforcer // Casbin 执行器
 }
 
-func initDB(conf dbConfig) (*casbin.Enforcer, error) {
+// initCasbinEnforcer 初始化 Casbin 执行器
+// 参数:
+//   - conf: 适配器配置
+//
+// 返回:
+//   - *casbin.Enforcer: Casbin 执行器实例
+//   - error: 错误信息
+func initCasbinEnforcer(conf adapterConfig) (*casbin.Enforcer, error) {
 	myDB, err := gdb.New(conf.config)
 	if err != nil {
 		return nil, fmt.Errorf("init db failed: %v", err)
@@ -86,7 +100,7 @@ func initDB(conf dbConfig) (*casbin.Enforcer, error) {
 	}
 
 	a := adapter.NewAdapter(adapter.Options{GDB: myDB})
-	e, err := casbin.NewEnforcer("rbac.conf", a)
+	e, err := casbin.NewEnforcer(conf.modelPath, a)
 	if err != nil {
 		return nil, fmt.Errorf("new enforcer failed: %v", err)
 	}
@@ -98,9 +112,11 @@ func initDB(conf dbConfig) (*casbin.Enforcer, error) {
 	return e, nil
 }
 
+// SetupTestData 设置测试数据
+// 参数:
+//   - rules: 权限规则列表
 func (o *TestObj) SetupTestData(rules [][]string) {
 	// 清理已有策略
-	// enforcer.ClearPolicy()
 	o.enforcer.DeletePermissionForUser(ADMIN_NAME)
 	o.enforcer.DeletePermissionForUser(NORMAL_NAME)
 
@@ -109,6 +125,11 @@ func (o *TestObj) SetupTestData(rules [][]string) {
 	}
 }
 
+// Test_CasbinPolicy 测试 Casbin 权限策略
+// 测试内容：
+// 1. 管理员权限验证
+// 2. 普通用户权限验证
+// 3. 非法访问验证
 func Test_CasbinPolicy(t *testing.T) {
 	rules := [][]string{
 		// 设置管理员权限
@@ -147,7 +168,7 @@ func Test_CasbinPolicy(t *testing.T) {
 			continue
 		}
 		t.Run(dbConf.name, func(t *testing.T) {
-			enforcer, err := initDB(dbConf)
+			enforcer, err := initCasbinEnforcer(dbConf)
 			if err != nil {
 				t.Fatalf("init db failed: %v", err)
 			}
